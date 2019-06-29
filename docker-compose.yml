@@ -1,0 +1,138 @@
+version: '3.7'
+
+services:
+  backend:
+    build: ./django
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./django/:/django/
+    ports:
+      - 8000:8000
+    environment:
+      - DEBUG=1
+      - SECRET_KEY=${DJANGO_SECRET_KEY}
+      - SQL_ENGINE=django.db.backends.postgresql
+      - SQL_DATABASE=${SQL_DATABASE}
+      - SQL_USER=${SQL_USER}
+      - SQL_PASSWORD=${SQL_PASSWORD}
+      - SQL_HOST=db
+      - SQL_PORT=5432
+    depends_on:
+      - db
+      - influxdb
+      - elasticsearch
+      - rabbitmq
+      - redis
+
+  celery_worker:
+    build: ./django
+    command: 'python -m celery -A ${DJANGO_PROJECT} worker -l debug'
+    volumes:
+      - ./django/:/django/
+    depends_on:
+      - django
+
+  celery_beat:
+    build: ./backend
+    command: 'python -m celery -A ${DJANGO_PROJECT} beat --pidfile= -l debug'
+    volumes:
+      - ./django/:/django/
+    depends_on:
+      - django
+
+  db:
+    image: postgres:11.2-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${SQL_USER}
+      - POSTGRES_PASSWORD=${SQL_PASSWORD}
+      - POSTGRES_DB=${SQL_DATABASE}
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.2.0
+    ports:
+      - 9200:9200
+    environment:
+      - discovery.type=single-node
+      - http.host=0.0.0.0
+      - transport.host=127.0.0.1
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms750m -Xmx750m
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.2.0
+    ports:
+      - 5601:5601
+    environment:
+      SERVER_NAME: localhost
+      ELASTICSEARCH_URL: http://elasticsearch:9200/
+    depends_on:
+      - elasticsearch
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=secret
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - elasticsearch
+      - influxdb
+
+
+  influxdb:
+    image: influxdb:latest
+    volumes:
+      # Mount for influxdb data directory
+      - influxdb_data:/var/lib/influxdb
+      # Mount for influxdb configuration
+      - influxdb_config:/etc/influxdb/
+    ports:
+      # The API for InfluxDB is served on port 8086
+      - 8086:8086
+      - 8082:8082
+
+  chronograf:
+    image: chronograf:latest
+    volumes:
+      # Mount for chronograf database
+      - chronograf_data:/var/lib/chronograf/
+    ports:
+      # The WebUI for Chronograf is served on port 8888
+      - 8888:8888
+    depends_on:
+      - influxdb
+
+  redis:
+    container_name: 'redis'
+    image: redis
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+
+  rabbitmq:
+    image: rabbitmq:alpine
+    command: rabbitmq-server
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - ./stack/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins
+    ports:
+      - 5672:5672
+      - 15672:15672
+
+volumes:
+  postgres_data:
+  influxdb_data:
+  influxdb_config:
+  cronograf_data:
+  elasticsearch_data:
+  grafana_data:
+  redis_data:
