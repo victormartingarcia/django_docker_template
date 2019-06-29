@@ -52,7 +52,7 @@ This is my design for an all-purpose backend, with a lot of focus on _observabil
 - [Kibana](https://www.elastic.co/es/products/kibana): Frontend for checking logs
 - [Influxdb](https://www.influxdata.com/): Timeseries database for storing metrics
 - [Chronograf](https://www.influxdata.com/time-series-platform/chronograf/): Frontend for checking metrics
-- [Grafana](https://grafana.com/): Real-time dashboards showing data from elasticsearch and influxdb. Used for email alerting.
+- [Grafana](https://grafana.com/): Real-time dashboards showing data from elasticsearch and influxdb. Used for email alerting
 
 ## Final notes
 
